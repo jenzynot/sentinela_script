@@ -3,6 +3,7 @@
 #
 # Uso (do repositório, depois do setup_host.sh e com o .env preenchido):
 #     sudo ./instalar.sh rede        # Fase 1:   br0 + hostapd + dnsmasq + firewall/NAT
+#     sudo ./instalar.sh portal      # Fase 1.5: portal cativo + ressync (precisa do banco)
 #     sudo ./instalar.sh verificar   # mostra o estado de tudo
 #
 # Cada etapa é idempotente: depois de um `git pull`, rode de novo.
@@ -98,6 +99,37 @@ Pronto quando (Fase 1): o celular conecta no SSID e pega IP.
 EOF
 }
 
+# --- Fase 1.5: portal cativo -------------------------------------------------
+
+banco_acessivel() {   # o usuário de serviço consegue logar no MySQL com o .env?
+    runuser -u "$USUARIO_SVC" -- "$PREFIXO/.venv/bin/python" -c "
+import sys; sys.path.insert(0, '$PREFIXO')
+from sentinela.config import carregar_env, mysql_params
+carregar_env()
+import mysql.connector
+mysql.connector.connect(**mysql_params()).close()" 2>/dev/null
+}
+
+etapa_portal() {
+    info "Fase 1.5 — portal cativo"
+    visudo -cf "$PREFIXO/captive/sudoers.sentinela" >/dev/null || erro "sudoers inválido"
+    install -m 440 -o root -g root "$PREFIXO/captive/sudoers.sentinela" /etc/sudoers.d/sentinela
+    ok "sudoers: '$USUARIO_SVC' só pode rodar /usr/sbin/nft como root"
+
+    banco_acessivel || erro "o portal não consegue acessar o banco — rode antes: sudo $0 banco"
+
+    instalar_units sentinela-ressync.service sentinela-portal.service
+    ativar sentinela-ressync.service sentinela-portal.service
+
+    cat <<EOF
+
+Pronto quando (Fase 1.5): o celular conecta, a tela do portal abre sozinha,
+o registro com a PORTAL_SENHA libera a navegação.
+  - Logs do portal:  journalctl -fu sentinela-portal
+  - Whitelist viva:  sudo nft list set inet portal autorizados
+EOF
+}
+
 # --- verificação -------------------------------------------------------------
 
 etapa_verificar() {
@@ -117,8 +149,9 @@ etapa_verificar() {
 ETAPA="${1:-}"
 case "$ETAPA" in
     rede)      preparar_base; etapa_rede ;;
+    portal)    preparar_base; etapa_portal ;;
     verificar) etapa_verificar ;;
     *)
-        sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '/^# Uso/,/^# Cada etapa/p' "$0" | sed 's/^# \{0,1\}//'
         exit 2 ;;
 esac

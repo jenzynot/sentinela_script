@@ -40,6 +40,30 @@ def test_pagina_mostra_o_mac_do_cliente(cliente):
     assert MAC in r.get_data(as_text=True)
 
 
+@pytest.mark.parametrize("caminho", [
+    "/generate_204",            # Android
+    "/hotspot-detect.html",     # iOS / macOS
+    "/connecttest.txt",         # Windows
+    "/qualquer/outra/coisa",
+])
+def test_deteccao_de_portal_cai_na_pagina_de_registro(cliente, caminho):
+    """Dado   um aparelho não autorizado testando a conexão por HTTP
+    Quando  o firewall redireciona o teste para o portal
+    Então   ele recebe a página de registro (e não o 204/'Success' esperado),
+            o que faz o sistema operacional abrir a tela do portal"""
+    r = cliente.get(caminho)
+
+    assert r.status_code == 200
+    assert MAC in r.get_data(as_text=True)
+
+
+def test_nome_muito_longo_e_cortado_no_tamanho_da_coluna(cliente, banco):
+    r = cliente.post("/registrar", data={"nome": "x" * 300, "senha": SENHA})
+
+    assert r.status_code == 200
+    assert dispositivos(banco)[0]["nome_dispositivo"] == "x" * 100
+
+
 def test_senha_errada_retorna_403_e_nao_grava_nem_libera(cliente, banco):
     """Dado   um cliente identificado
     Quando  envia /registrar com a senha errada

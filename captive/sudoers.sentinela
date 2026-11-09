@@ -1,0 +1,8 @@
+# /etc/sudoers.d/sentinela — instalado pelo instalar.sh (etapa "portal").
+#
+# O portal e o ressync rodam como o usuário de serviço "sentinela", sem root.
+# A única coisa que ele pode fazer como root é chamar o nft, sem senha.
+# Menor privilégio: se o Flask for comprometido, o atacante não vira root —
+# mas ainda consegue mexer no firewall (risco residual documentado em
+# docs/seguranca.md).
+sentinela ALL=(root) NOPASSWD: /usr/sbin/nft

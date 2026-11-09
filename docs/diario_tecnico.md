@@ -87,3 +87,21 @@ Formato de cada entrada: **o que foi feito**, **decisões e por quê**, **proble
 
 ### Próximos passos
 - [ ] No Mint: preencher o `.env`, `sudo ./instalar.sh rede` e confirmar o celular pegando IP.
+
+---
+
+## 2026-11-09 — Fase 1.5: portal cativo
+
+### O que foi feito
+- Portal responde a **qualquer caminho em GET** com a página de registro: é o que faz Android (`/generate_204`), iOS (`/hotspot-detect.html`) e Windows (`/connecttest.txt`) abrirem a tela do portal sozinhos.
+- Página adaptada ao celular (viewport, campos grandes) e tela de sucesso mostrando o MAC liberado.
+- Nome do dispositivo cortado em 100 caracteres (tamanho da coluna — o MySQL em modo estrito recusaria).
+- `captive/sudoers.sentinela` + etapa `instalar.sh portal`: valida o sudoers com `visudo -c`, confere o acesso ao banco como o usuário de serviço e sobe `sentinela-ressync` + `sentinela-portal`.
+- Guia em `docs/fase1_5_portal.md`; testes novos no Job 4 (detecção de portal, nome longo).
+
+### Decisões e por quê
+- **Responder a página em vez de redirecionar (302):** um passo a menos; o POST para `/registrar` também passa pelo redirect do firewall e funciona.
+- **Etapa `portal` exige o banco:** o portal grava em `TB_DISPOSITIVOS`; sem banco ele subiria e quebraria no primeiro registro. Falhar cedo, na instalação, com a instrução `sudo ./instalar.sh banco`.
+
+### Próximos passos
+- [ ] No Mint (depois da Fase 3): `sudo ./instalar.sh portal` e registrar o celular de teste.
