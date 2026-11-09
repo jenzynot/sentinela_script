@@ -105,3 +105,31 @@ Formato de cada entrada: **o que foi feito**, **decisões e por quê**, **proble
 
 ### Próximos passos
 - [ ] No Mint (depois da Fase 3): `sudo ./instalar.sh portal` e registrar o celular de teste.
+
+---
+
+## 2026-11-09 — Fase 2: VM Windows Server automatizada
+
+### O que foi feito
+- `provision/vbox.py`: envelope do `VBoxManage` com executor injetável (nos testes, um falso grava os comandos).
+- `provision/vm.py`: `criar → instalar → aguardar → configurar → autorizar` (e `status`, `iniciar`, `parar`, `destruir`, `imagens`), tudo a partir do bloco `VM_*` do `.env`.
+- A VM entra na `br0` com **MAC fixo**: o `dnsmasq` dá sempre o mesmo IP (`VM_IP`) e o MAC vai direto para a whitelist.
+- Configuração interna da VM por `guestcontrol` + PowerShell: RDP com NLA, regra de firewall do Windows e IIS com o "Painel da Casa".
+- 14 testes de unidade (Job 0) e guia em `docs/fase2_vm.md`.
+
+### Decisões e por quê
+- **Executor injetável:** VirtualBox não roda no runner do CI, mas a lógica (sequência de comandos, flags, idempotência, re-tentativas) é testável assim.
+- **Senha por arquivo temporário 600** (`--password-file` / `--passwordfile`): na linha de comando ela apareceria no `ps` para qualquer usuário do host.
+- **Validação da senha antes de instalar:** a política do Windows recusa senha fraca e a instalação desatendida trava sem mensagem — melhor falhar na hora com o motivo.
+- **`aguardar` exige 3 leituras estáveis:** a instalação reinicia o Windows algumas vezes; uma leitura isolada pode cair no meio de um reboot.
+- **PowerShell via `-EncodedCommand`:** evita escapar aspas e acentos entre Python → VBoxManage → Windows.
+- **Regra de RDP pelo ID neutro (`@FirewallAPI.dll,-28752`):** o nome "Remote Desktop" muda conforme o idioma da ISO.
+- **Rodar como usuário comum (recusa root):** VMs do VirtualBox pertencem ao usuário que as cria; como root, a VM some da interface do usuário.
+- **Painel da casa = página no IIS (placeholder):** o roteiro deixa a escolha (painel, app ou jogo) para a equipe; o caminho para trocar está na própria página.
+
+### Problemas encontrados
+- Instalação real do Windows não é testável no CI (ISO, tempo, licença) — fica no roteiro manual do Mint.
+
+### Próximos passos
+- [ ] No Mint: baixar a ISO de avaliação, preencher `VM_*` e rodar `python -m provision.vm tudo`.
+- [ ] Testar RDP do celular em `192.168.50.10`.
