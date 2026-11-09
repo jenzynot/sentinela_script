@@ -1,0 +1,15 @@
+[Unit]
+Description=Sentinela — firewall nftables: whitelist, NAT e portal (Fases 1/1.5)
+# Se o nftables.service da distro estiver ativo, ele roda "flush ruleset":
+# carregamos depois dele para não sermos apagados.
+After=nftables.service sentinela-bridge.service
+PartOf=sentinela.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /opt/sentinela/captive/firewall.nft
+ExecStop=/usr/sbin/nft delete table inet portal
+
+[Install]
+WantedBy=sentinela.target

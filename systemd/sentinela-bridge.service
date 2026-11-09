@@ -1,0 +1,13 @@
+[Unit]
+Description=Sentinela — bridge br0 e encaminhamento IP (Fase 1)
+After=network-pre.target NetworkManager.service
+PartOf=sentinela.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/sentinela/network/rede.sh subir
+ExecStop=/opt/sentinela/network/rede.sh descer
+
+[Install]
+WantedBy=sentinela.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Sentinela — DHCP e DNS do segmento (dnsmasq na br0)
+Requires=sentinela-bridge.service
+After=sentinela-bridge.service sentinela-firewall.service
+PartOf=sentinela.target
+
+[Service]
+ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/etc/sentinela/dnsmasq.conf --pid-file=/run/sentinela-dnsmasq.pid
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=sentinela.target

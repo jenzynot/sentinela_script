@@ -1,0 +1,6 @@
+[Unit]
+Description=Sentinela — data center doméstico (rede, portal e agente)
+Wants=sentinela-bridge.service sentinela-firewall.service sentinela-ap.service sentinela-dhcp.service
+
+[Install]
+WantedBy=multi-user.target

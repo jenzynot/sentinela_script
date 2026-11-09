@@ -60,3 +60,30 @@ Formato de cada entrada: **o que foi feito**, **decisões e por quê**, **proble
 ### Próximos passos
 - [ ] Criar o repositório no GitHub, dar push e acompanhar a primeira execução do CI.
 - [ ] Fase 1: `hostapd` + `br0` + `dnsmasq` no Mint.
+
+---
+
+## 2026-11-09 — Fase 1: rede controlada
+
+### O que foi feito
+- `network/gerar_configs.py`: gera `hostapd.conf`, `dnsmasq.conf` e o drop-in do NetworkManager a partir do `.env`, validando tudo antes (SSID, tamanho da senha WPA, gateway dentro do segmento, faixa DHCP).
+- `network/rede.sh subir|descer|status`: cria a `br0` com o IP do gateway, liga `ip_forward` e tira a placa Wi-Fi do NetworkManager.
+- Units systemd (`systemd/`) agrupadas em `sentinela.target`: bridge → firewall → AP (`hostapd`) → DHCP/DNS (`dnsmasq`).
+- `instalar.sh rede`: implanta o código em `/opt/sentinela`, copia o `.env` para `/etc/sentinela/sentinela.env`, gera as configs e sobe os serviços. `instalar.sh verificar` mostra o estado.
+- CI ganhou o **Job 0** (unidade + `shellcheck` dos scripts) e as actions foram atualizadas (Node 24, runner `ubuntu-24.04` = base do Mint 22).
+- Guia em `docs/fase1_rede.md`.
+
+### Decisões e por quê
+- **Instâncias próprias de `hostapd`/`dnsmasq`** (`sentinela-ap`, `sentinela-dhcp`) em vez dos serviços da distro: config isolada em `/etc/sentinela`, sem depender de `/etc/default/hostapd` nem do `/etc/dnsmasq.conf` global.
+- **`dnsmasq` com `bind-interfaces` só na `br0`**: não disputa a porta 53 com o `systemd-resolved` do host.
+- **DNS upstream fixo (`no-resolv` + `server=`)**: o segmento não herda o DNS da rede da faculdade/casa; escolha explícita (Cloudflare + Quad9 por padrão).
+- **`ap_isolate=1`**: clientes Wi-Fi não se falam direto pelo rádio; tudo passa pela `br0`.
+- **Código em `/opt/sentinela`**: o usuário de serviço `sentinela` (portal) não consegue ler `/home/<usuário>`; a cópia em `/opt` resolve e separa "repositório de trabalho" de "instalação".
+- **Geração de config em Python, não `envsubst`**: precisa de lógica (rede aberta × WPA2, reserva da VM) e de validação — e assim é testável no CI.
+- **Recusa de quebra de linha no SSID/senha**: sem isso, `WIFI_SSID="x\nwpa=0"` injetaria diretivas no `hostapd.conf`.
+
+### Problemas encontrados
+- Nada testável em hardware ainda: a validação real (celular pega IP) depende do Mint com a placa em modo AP.
+
+### Próximos passos
+- [ ] No Mint: preencher o `.env`, `sudo ./instalar.sh rede` e confirmar o celular pegando IP.

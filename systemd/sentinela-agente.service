@@ -1,0 +1,16 @@
+[Unit]
+Description=Sentinela — agente de monitoramento (Fase 5)
+After=sentinela-bridge.service mysql.service
+Wants=mysql.service
+PartOf=sentinela.target
+
+[Service]
+# Root: arp-scan e nmap -sS precisam de sockets crus.
+EnvironmentFile=/etc/sentinela/sentinela.env
+WorkingDirectory=/opt/sentinela
+ExecStart=/opt/sentinela/.venv/bin/python -m sentinela
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=sentinela.target

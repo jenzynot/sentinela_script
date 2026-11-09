@@ -1,0 +1,13 @@
+[Unit]
+Description=Sentinela — Access Point Wi-Fi (hostapd na br0)
+Requires=sentinela-bridge.service
+After=sentinela-bridge.service sentinela-firewall.service
+PartOf=sentinela.target
+
+[Service]
+ExecStart=/usr/sbin/hostapd /etc/sentinela/hostapd.conf
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=sentinela.target

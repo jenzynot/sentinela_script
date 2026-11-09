@@ -1,0 +1,18 @@
+[Unit]
+Description=Sentinela — repovoa a whitelist do firewall a partir do banco (Fase 1.5)
+# Ordem do boot: firewall.nft (conjunto vazio) -> ressync -> portal.
+# PartOf: se o firewall for recarregado (conjunto zerado), o ressync roda de novo.
+Requires=sentinela-firewall.service
+After=sentinela-firewall.service mysql.service
+PartOf=sentinela-firewall.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=sentinela
+EnvironmentFile=/etc/sentinela/sentinela.env
+WorkingDirectory=/opt/sentinela/captive
+ExecStart=/opt/sentinela/.venv/bin/python ressync.py
+
+[Install]
+WantedBy=sentinela.target

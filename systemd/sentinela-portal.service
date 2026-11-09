@@ -1,0 +1,17 @@
+[Unit]
+Description=Sentinela — portal cativo (Flask na 8080)
+Wants=sentinela-ressync.service
+After=sentinela-ressync.service mysql.service
+PartOf=sentinela.target
+
+[Service]
+# Não roda como root: só o `nft` é liberado via sudoers (menor privilégio).
+User=sentinela
+EnvironmentFile=/etc/sentinela/sentinela.env
+WorkingDirectory=/opt/sentinela/captive
+ExecStart=/opt/sentinela/.venv/bin/python portal.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=sentinela.target
