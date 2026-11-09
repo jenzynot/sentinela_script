@@ -5,8 +5,8 @@ bridge, sem hardware nenhum. Precisa de root (no CI: `sudo -E`).
 
 CONTRATO DO AGENTE (Fase 5)
 ---------------------------
-Os testes do agente ficam pulados até o pacote `sentinela/` existir, e
-passam a valer sozinhos quando ele for criado. O que eles esperam:
+Escrito antes do agente existir (os testes ficavam pulados) e cumprido pela
+implementação em sentinela/. O que eles exigem:
 
     sentinela/scanner.py
         Scanner(interface: str)
@@ -22,7 +22,7 @@ passam a valer sozinhos quando ele for criado. O que eles esperam:
     Tipos gravados em TB_ALERTAS.tipo_alerta:
         "dispositivo_nao_autorizado", "porta_nova"
 
-Se a Fase 5 decidir outra interface, ajuste este contrato junto.
+Mudou a interface do agente? Ajuste este contrato junto.
 """
 import os
 import socket

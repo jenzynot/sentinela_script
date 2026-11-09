@@ -153,3 +153,24 @@ Formato de cada entrada: **o que foi feito**, **decisões e por quê**, **proble
 
 ### Próximos passos
 - [ ] No Mint: `sudo ./instalar.sh banco`, depois `sudo ./instalar.sh portal`.
+
+---
+
+## 2026-11-09 — Fase 5: agente Sentinela
+
+### O que foi feito
+- Pacote `sentinela/` com as classes do planejamento: `Scanner`, `Repositorio`, `Whitelist`, `Alerta`, mais o orquestrador `Sentinela` e o `python -m sentinela` (loop, `--uma-vez`, log em arquivo + journald, encerra limpo no SIGTERM).
+- O contrato que os testes do Job 3 definiram antes do agente existir foi cumprido: os testes que estavam pulados agora rodam contra namespaces reais no CI.
+- Etapa `instalar.sh agente`: confere `arp-scan`/`nmap` e o banco, roda **um ciclo de teste** e só então sobe o serviço.
+- Testes de unidade das regras (Job 0) com dublês de banco e scanner; guia em `docs/fase5_agente.md`.
+
+### Decisões e por quê
+- **arp-scan para descoberta, nmap para portas:** ARP enxerga quem bloqueia ping (Windows bloqueia por padrão); o nmap roda uma vez com todos os IPs.
+- **Alerta de intruso na chegada, não a cada ciclo:** evita enxurrada de alertas iguais; sair e voltar alerta de novo.
+- **Porta nova contra a última aparição do dispositivo**, não só o ciclo anterior: pega quem some e volta diferente.
+- **Varredura fora da transação, notificação depois do commit:** banco não fica travado esperando o nmap; ninguém é avisado de algo que não ficou gravado.
+- **Uma conexão por ciclo:** sem conexão longa para cair por `wait_timeout` do MySQL.
+- **E-mail opcional e agrupado:** um e-mail por ciclo; sem SMTP configurado, só log + banco.
+
+### Próximos passos
+- [ ] No Mint: `sudo ./instalar.sh agente` e provocar um alerta com um aparelho não registrado.

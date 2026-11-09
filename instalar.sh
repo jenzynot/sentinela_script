@@ -5,6 +5,7 @@
 #     sudo ./instalar.sh rede        # Fase 1:   br0 + hostapd + dnsmasq + firewall/NAT
 #     sudo ./instalar.sh banco       # Fases 3-4: MySQL protegido + schema + usuário dedicado
 #     sudo ./instalar.sh portal      # Fase 1.5: portal cativo + ressync (precisa do banco)
+#     sudo ./instalar.sh agente      # Fase 5:   agente Sentinela (precisa do banco)
 #     sudo ./instalar.sh verificar   # mostra o estado de tudo
 #
 # Cada etapa é idempotente: depois de um `git pull`, rode de novo.
@@ -140,6 +141,32 @@ o registro com a PORTAL_SENHA libera a navegação.
 EOF
 }
 
+# --- Fase 5: agente Sentinela ------------------------------------------------
+
+etapa_agente() {
+    info "Fase 5 — agente Sentinela"
+    command -v arp-scan >/dev/null && command -v nmap >/dev/null \
+        || erro "arp-scan/nmap ausentes — rode o setup_host.sh"
+    banco_acessivel || erro "o agente não consegue acessar o banco — rode antes: sudo $0 banco"
+    install -d -m 750 /var/log/sentinela
+
+    info "Ciclo de teste (um só, em primeiro plano)"
+    # o agente lê o $ENV_FILE sozinho (sentinela.config.carregar_env)
+    (cd "$PREFIXO" && "$PREFIXO/.venv/bin/python" -m sentinela --uma-vez) \
+        || erro "o ciclo de teste falhou — veja a mensagem acima"
+
+    instalar_units sentinela-agente.service
+    ativar sentinela-agente.service
+
+    cat <<EOF
+
+Pronto quando (Fase 5): conectar um aparelho fora da whitelist gera alerta.
+  - Ao vivo:     journalctl -fu sentinela-agente
+  - Arquivo:     /var/log/sentinela/sentinela.log
+  - No banco:    sudo mysql vigia_de_rede -e "SELECT * FROM TB_ALERTAS ORDER BY id_alerta DESC LIMIT 5"
+EOF
+}
+
 # --- verificação -------------------------------------------------------------
 
 etapa_verificar() {
@@ -161,6 +188,7 @@ case "$ETAPA" in
     rede)      preparar_base; etapa_rede ;;
     banco)     preparar_base; etapa_banco ;;
     portal)    preparar_base; etapa_portal ;;
+    agente)    preparar_base; etapa_agente ;;
     verificar) etapa_verificar ;;
     *)
         sed -n '/^# Uso/,/^# Cada etapa/p' "$0" | sed 's/^# \{0,1\}//'
