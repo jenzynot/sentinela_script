@@ -197,3 +197,30 @@ Formato de cada entrada: **o que foi feito**, **decisões e por quê**, **proble
 ### Próximos passos
 - [ ] No Mint: `sudo ./instalar.sh seguranca`, ensaiar um restore e guardar a saída como evidência.
 - [ ] Rodar o roteiro da Kali e registrar os resultados no relatório.
+
+### Correções após o primeiro CI da Fase 6
+- O `mysqldump` **ignora** `MYSQL_HOST` no ambiente (o cliente `mysql` respeita): o backup tentou o socket local no CI. Host/porta agora vão como argumentos quando definidos.
+- O `nft` lista os elementos de conjuntos em ordem própria (`{ "wg0", "br0" }`): o teste passou a aceitar qualquer ordem.
+- Editar pelo Windows (`\wsl.localhost`) zerava o bit de execução dos scripts: o modo agora fica fixado no índice do Git (`git update-index --chmod=+x`), o `restore.sh` chama `bash backup.sh` e o `instalar.sh` garante 755 em `/opt`.
+- Lição: foi o teste automatizado do restore que pegou os dois primeiros problemas — exatamente o "backup que nunca foi restaurado" que o planejamento alerta.
+
+---
+
+## 2026-11-09 — Fase 7: documentação e ensaio
+
+### O que foi feito
+- `docs/roteiro_ensaio.md`: checklist de bancada, roteiro cronometrado (≤ 12 min) com o que mostrar em cada passo, consultas SQL prontas, incidente simulado e **plano B** para cada ponto que pode falhar ao vivo.
+- `docs/testes_manuais.md`: os 14 testes que dependem de hardware (Wi-Fi, celular, VM, RDP, VPN, Kali), no formato dado → quando → então, com coluna de resultado.
+- README reescrito: arquitetura, "do zero à demo" na ordem certa de instalação, tabela fase → guia → critério de pronto, CI com o que cada job prova.
+
+### Estado do projeto
+- Todo o código das Fases 0 a 7 está no repositório e o CI cobre o que é testável sem hardware (5 jobs).
+- **Nada foi executado ainda no Mint real.** O caminho crítico (Fase 1 → 2 → 5) depende da placa Wi-Fi em modo AP, da ISO do Windows e do celular de teste.
+
+### Próximos passos (no Mint)
+- [ ] `setup_host.sh` → `.env` → `instalar.sh rede` → celular pega IP (M1).
+- [ ] `instalar.sh banco` → `instalar.sh portal` → registro pelo celular (M2–M5).
+- [ ] `provision.vm tudo` → RDP do celular (M6–M8).
+- [ ] `instalar.sh agente` → alerta ao vivo (M9–M10).
+- [ ] `instalar.sh seguranca` → ensaio de restore (M14); roteiro da Kali (M12–M13).
+- [ ] Dois ensaios cronometrados do `roteiro_ensaio.md`, anotando tempos aqui.
