@@ -2,6 +2,9 @@
 #
 # Tudo que vem DEPOIS de "o cliente já está na br0" é testado aqui, num Linux
 # real. Wi-Fi, celular, VM Windows e RDP ficam no roteiro manual do Mint.
+#
+# Runner fixado em ubuntu-24.04: mesma base do Linux Mint 22 (kernel, nftables,
+# MySQL, Python 3.12), para o CI se comportar como o host de verdade.
 name: CI
 
 on:
@@ -30,7 +33,7 @@ env:
 jobs:
   banco:
     name: "Job 1 · Banco (schema + queries)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       mysql: &mysql
         image: mysql:8.0
@@ -42,17 +45,17 @@ jobs:
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
           --health-interval=5s --health-timeout=5s --health-retries=30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/preparar
       - run: .venv/bin/python -m pytest -v -m banco
 
   firewall:
     name: "Job 2 · Firewall / whitelist (nftables)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       mysql: *mysql
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/preparar
         with:
           pacotes: nftables
@@ -60,11 +63,11 @@ jobs:
 
   rede:
     name: "Job 3 · Rede simulada + Sentinela"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       mysql: *mysql
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/preparar
         with:
           pacotes: nmap arp-scan
@@ -73,10 +76,10 @@ jobs:
 
   portal:
     name: "Job 4 · Portal cativo (Flask)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       mysql: *mysql
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/preparar
       - run: .venv/bin/python -m pytest -v -m portal
