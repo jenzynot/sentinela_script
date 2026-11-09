@@ -1,5 +1,6 @@
 """Job 1 — Banco de dados: schema + queries (planejamento_testes.md §2)."""
 import os
+import shutil
 import subprocess
 from datetime import datetime
 
@@ -192,3 +193,73 @@ def test_setup_banco_recusa_config_perigosa(tmp_path, banco, conteudo, trecho):
 
     assert r.returncode != 0
     assert trecho in r.stderr
+
+
+# --- Fase 6: security/backup.sh + restore.sh ---------------------------------
+
+def rodar_script(nome, *args, backup_dir):
+    a = _admin()
+    return subprocess.run(
+        ["bash", str(RAIZ / "security" / nome), *map(str, args)],
+        capture_output=True, text=True,
+        env={**os.environ, "MYSQL_HOST": a["host"], "MYSQL_TCP_PORT": str(a["port"]),
+             "MYSQL_ADMIN_USER": a["user"], "MYSQL_PWD": a["password"],
+             "BACKUP_DIR": str(backup_dir)})
+
+
+def macs(cx):
+    cur = cx.cursor()
+    cur.execute("SELECT endereco_mac FROM TB_DISPOSITIVOS ORDER BY endereco_mac")
+    return [m for (m,) in cur.fetchall()]
+
+
+def test_backup_e_restore_recuperam_o_estado_do_banco(banco, tmp_path):
+    """Simulação de incidente:
+    Dado   um banco com 2 dispositivos e um backup tirado nesse momento
+    Quando  o banco muda depois (entra um 3º, um some) e restauro o backup
+    Então   o banco volta exatamente ao estado do backup, e o estado
+            "estragado" também ficou guardado (backup de segurança do restore)"""
+    if not shutil.which("mysqldump"):
+        pytest.fail("mysqldump não instalado") if os.environ.get("CI") else pytest.skip("sem mysqldump")
+    inserir_dispositivo(banco, "02:00:00:00:00:01", autorizado=True)
+    inserir_dispositivo(banco, "02:00:00:00:00:02")
+
+    r = rodar_script("backup.sh", backup_dir=tmp_path)
+    assert r.returncode == 0, r.stderr
+    [backup] = list(tmp_path.glob("vigia_de_rede_*.sql.gz"))
+    assert oct(backup.stat().st_mode & 0o777) == "0o600"
+
+    banco.cursor().execute("DELETE FROM TB_DISPOSITIVOS WHERE endereco_mac = '02:00:00:00:00:02'")
+    inserir_dispositivo(banco, "02:00:00:00:00:99")
+    assert macs(banco) == ["02:00:00:00:00:01", "02:00:00:00:00:99"]
+
+    r = rodar_script("restore.sh", backup, "--sim", backup_dir=tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+    assert macs(banco) == ["02:00:00:00:00:01", "02:00:00:00:00:02"]
+    assert len(list(tmp_path.glob("vigia_de_rede_*.sql.gz"))) == 2   # + o de segurança
+
+
+def test_restore_recusa_arquivo_corrompido(banco, tmp_path):
+    ruim = tmp_path / "vigia_de_rede_ruim.sql.gz"
+    ruim.write_bytes(b"isto nao e gzip")
+
+    r = rodar_script("restore.sh", ruim, "--sim", backup_dir=tmp_path)
+
+    assert r.returncode != 0 and "corrompido" in r.stderr
+
+
+def test_restore_sem_confirmacao_nao_faz_nada(banco, tmp_path):
+    inserir_dispositivo(banco, "02:00:00:00:00:01")
+    r = rodar_script("backup.sh", backup_dir=tmp_path)
+    [backup] = list(tmp_path.glob("*.sql.gz"))
+    inserir_dispositivo(banco, "02:00:00:00:00:02")
+
+    a = _admin()
+    r = subprocess.run(["bash", str(RAIZ / "security" / "restore.sh"), str(backup)],
+                       input="nao\n", capture_output=True, text=True,
+                       env={**os.environ, "MYSQL_HOST": a["host"], "MYSQL_PWD": a["password"],
+                            "MYSQL_ADMIN_USER": a["user"], "BACKUP_DIR": str(tmp_path)})
+
+    assert "Cancelado" in r.stdout
+    assert macs(banco) == ["02:00:00:00:00:01", "02:00:00:00:00:02"]

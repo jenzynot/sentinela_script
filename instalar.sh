@@ -6,6 +6,9 @@
 #     sudo ./instalar.sh banco       # Fases 3-4: MySQL protegido + schema + usuário dedicado
 #     sudo ./instalar.sh portal      # Fase 1.5: portal cativo + ressync (precisa do banco)
 #     sudo ./instalar.sh agente      # Fase 5:   agente Sentinela (precisa do banco)
+#     sudo ./instalar.sh seguranca   # Fase 6:   backup diário (cron) + firewall endurecido
+#     sudo ./instalar.sh vpn         # Fase 6:   servidor WireGuard (opcional)
+#     sudo ./instalar.sh tudo        # rede + banco + portal + agente + seguranca
 #     sudo ./instalar.sh verificar   # mostra o estado de tudo
 #
 # Cada etapa é idempotente: depois de um `git pull`, rode de novo.
@@ -167,6 +170,41 @@ Pronto quando (Fase 5): conectar um aparelho fora da whitelist gera alerta.
 EOF
 }
 
+# --- Fase 6: segurança -------------------------------------------------------
+
+etapa_seguranca() {
+    info "Fase 6 — backup automático + firewall endurecido"
+    # recarrega o firewall (chain input com policy drop); o ressync repovoa a whitelist
+    systemctl restart sentinela-firewall.service
+    systemctl is-active -q sentinela-ressync.service && systemctl restart sentinela-ressync.service
+    ok "firewall recarregado (detalhes: sudo nft list table inet portal)"
+
+    cat > /etc/cron.d/sentinela-backup <<EOF
+# Backup diário do banco às 02:00 (security/backup.sh) — retenção de 7 dias
+SHELL=/bin/bash
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+0 2 * * * root $PREFIXO/security/backup.sh >> /var/log/sentinela_backup.log 2>&1
+EOF
+    chmod 644 /etc/cron.d/sentinela-backup
+    ok "cron do backup instalado (/etc/cron.d/sentinela-backup)"
+
+    info "Primeiro backup, agora"
+    "$PREFIXO/security/backup.sh" | tee -a /var/log/sentinela_backup.log
+
+    cat <<EOF
+
+Ensaio de restore (faça antes da apresentação):
+  sudo $PREFIXO/security/restore.sh /var/backups/sentinela/<arquivo>.sql.gz
+VPN (opcional):  sudo $0 vpn  &&  sudo $PREFIXO/security/wireguard.sh peer celular
+EOF
+}
+
+etapa_vpn() {
+    info "Fase 6 — VPN WireGuard"
+    "$PREFIXO/security/wireguard.sh" servidor
+    echo "Crie um cliente com: sudo $PREFIXO/security/wireguard.sh peer <nome>"
+}
+
 # --- verificação -------------------------------------------------------------
 
 etapa_verificar() {
@@ -189,6 +227,9 @@ case "$ETAPA" in
     banco)     preparar_base; etapa_banco ;;
     portal)    preparar_base; etapa_portal ;;
     agente)    preparar_base; etapa_agente ;;
+    seguranca) preparar_base; etapa_seguranca ;;
+    vpn)       preparar_base; etapa_vpn ;;
+    tudo)      preparar_base; etapa_rede; etapa_banco; etapa_portal; etapa_agente; etapa_seguranca ;;
     verificar) etapa_verificar ;;
     *)
         sed -n '/^# Uso/,/^# Cada etapa/p' "$0" | sed 's/^# \{0,1\}//'

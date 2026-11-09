@@ -5,6 +5,8 @@
 # seguida a apagam, tudo na mesma transação. Recarregar o arquivo nunca
 # duplica regras. O conjunto 'autorizados' renasce vazio; quem o repovoa é o
 # ressync.py, a partir do banco (banco = verdade, conjunto = espelho).
+#
+# Regras explicadas uma a uma em docs/seguranca.md.
 table inet portal
 delete table inet portal
 
@@ -13,10 +15,32 @@ table inet portal {
         type ether_addr          # a whitelist viva
     }
 
+    # --- tráfego PARA o host (Fase 6: hardening) ---------------------------
+    chain input {
+        type filter hook input priority filter; policy drop;
+        iif "lo" accept
+        ct state established,related accept
+        ct state invalid drop
+        meta l4proto { icmp, ipv6-icmp } accept
+        # respostas de DHCP para o próprio host no uplink (v4 e v6)
+        udp dport { 68, 546 } accept
+        # segmento da casa: DHCP, DNS e o portal cativo — nada além disso
+        iifname "br0" udp dport { 53, 67 } accept
+        iifname "br0" tcp dport { 53, 8080 } accept
+        # VPN de acesso remoto (WireGuard) chega pelo uplink
+        udp dport 51820 accept
+        # quem está na VPN é tratado como "de casa"
+        iifname "wg0" accept
+        # o resto cai (policy drop) — inclusive MySQL e SSH vindos de fora
+    }
+
+    # --- tráfego ATRAVÉS do host (segmento <-> internet / VPN) --------------
     chain forward {
         type filter hook forward priority filter; policy drop;
         ct state established,related accept
         ether saddr @autorizados accept
+        # VPN -> rede da casa (ex.: RDP na VM de fora de casa)
+        iifname "wg0" oifname "br0" accept
         # quem não está no conjunto cai aqui (policy drop)
     }
 
@@ -28,6 +52,7 @@ table inet portal {
 
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
-        oifname != "br0" masquerade
+        # só o que sai do segmento para a internet é mascarado
+        iifname "br0" oifname != { "br0", "wg0" } masquerade
     }
 }

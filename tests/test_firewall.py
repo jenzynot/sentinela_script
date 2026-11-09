@@ -32,6 +32,27 @@ def test_recarregar_ruleset_nao_duplica_regras(ruleset):
     assert nft("list", "chain", "inet", "portal", "forward").stdout == antes
 
 
+def test_input_fecha_o_host_e_so_abre_o_necessario(ruleset):
+    """Dado   o firewall carregado
+    Quando  leio a chain input
+    Então   a política é drop e só DHCP/DNS/portal (na br0) e WireGuard estão abertos"""
+    entrada = nft("list", "chain", "inet", "portal", "input").stdout
+
+    assert "policy drop" in entrada
+    assert 'iifname "br0" udp dport { 53, 67 } accept' in entrada
+    assert 'iifname "br0" tcp dport { 53, 8080 } accept' in entrada
+    assert "udp dport 51820 accept" in entrada
+    assert "3306" not in entrada and "dport 22 " not in entrada
+
+
+def test_vpn_alcanca_a_rede_da_casa_e_nat_so_para_o_segmento(ruleset):
+    forward = nft("list", "chain", "inet", "portal", "forward").stdout
+    post = nft("list", "chain", "inet", "portal", "postrouting").stdout
+
+    assert 'iifname "wg0" oifname "br0" accept' in forward
+    assert 'iifname "br0" oifname != { "br0", "wg0" } masquerade' in post
+
+
 def test_liberar_coloca_mac_no_conjunto(ruleset):
     """Dado   o conjunto vazio
     Quando  libero um MAC

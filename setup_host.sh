@@ -30,6 +30,9 @@ PACOTES=(
     python3-venv
     python3-pip
     git
+    rsync           # implantação em /opt/sentinela (instalar.sh)
+    wireguard-tools # VPN de acesso remoto (Fase 6)
+    qrencode        # QR code da config do WireGuard para o celular (Fase 6)
 )
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

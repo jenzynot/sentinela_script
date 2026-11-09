@@ -174,3 +174,26 @@ Formato de cada entrada: **o que foi feito**, **decisões e por quê**, **proble
 
 ### Próximos passos
 - [ ] No Mint: `sudo ./instalar.sh agente` e provocar um alerta com um aparelho não registrado.
+
+---
+
+## 2026-11-09 — Fase 6: segurança e hardening
+
+### O que foi feito
+- Firewall endurecido: chain `input` com `policy drop` (o segmento só alcança DNS, DHCP e o portal no host; MySQL/SSH inacessíveis de fora), regra `wg0 → br0` para a VPN e masquerade só do segmento.
+- `security/backup.sh` + `restore.sh` (do planejamento, com melhorias) e cron diário às 02:00 (`instalar.sh seguranca`).
+- `security/wireguard.sh`: servidor + peers com QR code, túnel dividido e chave pré-compartilhada (`instalar.sh vpn`).
+- `docs/seguranca.md`: firewall regra por regra, contas e privilégios, DNS seguro, VPN, backup, roteiro de testes com a Kali e tabela de vulnerabilidades conhecidas.
+- CI: Job 1 ensaia o incidente (backup → estrago → restore → estado igual ao backup) a cada push; Job 2 confere a chain `input`.
+
+### Decisões e por quê
+- **Restore tira backup do estado atual antes de sobrescrever:** restore errado também precisa ter volta.
+- **Backup só vale depois do `gzip -t`** (arquivo `.tmp` → `mv`): um dump interrompido nunca vira "o último backup".
+- **Nome do backup com milissegundos:** sem isso, o backup de segurança do restore podia sobrescrever, no mesmo segundo, o arquivo sendo restaurado (achado ao escrever o teste).
+- **Backup/restore como root pelo socket:** sem senha de banco em script nem em crontab.
+- **VPN com túnel dividido:** o celular só desvia o tráfego da casa; não vira um proxy de toda a navegação.
+- **Vulnerabilidades documentadas, não escondidas:** clonagem de MAC, senha compartilhada e o tráfego L2 dentro da `br0` (a tabela `inet` filtra o que é roteado, não o que é comutado na bridge) — com impacto e mitigação.
+
+### Próximos passos
+- [ ] No Mint: `sudo ./instalar.sh seguranca`, ensaiar um restore e guardar a saída como evidência.
+- [ ] Rodar o roteiro da Kali e registrar os resultados no relatório.
