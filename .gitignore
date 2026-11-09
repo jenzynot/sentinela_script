@@ -1,0 +1,26 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Segredos e configuração local (senhas do MySQL, do portal, chaves WireGuard)
+.env
+*.key
+security/wireguard/*.conf
+
+# Backups do banco (ficam em /var/backups/sentinela, nunca no repositório)
+*.sql.gz
+
+# VirtualBox / ISOs
+*.iso
+*.vdi
+*.vbox-prev
+
+# Logs
+*.log
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

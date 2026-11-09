@@ -1,0 +1,6 @@
+# Normaliza fim de linha para LF — scripts com CRLF quebram no Linux
+# (o repositório também é editado pelo Windows via \\wsl.localhost).
+* text=auto eol=lf
+*.sh  text eol=lf
+*.nft text eol=lf
+*.conf text eol=lf
