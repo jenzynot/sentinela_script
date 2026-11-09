@@ -17,6 +17,8 @@
    IIS + RDP             └────────────────────────────────────────────────────────────────────┘
 ```
 
+**Começando agora?** [`docs/development.md`](docs/development.md) (bootstrap, testes, ver funcionando) · [`docs/arquitetura.md`](docs/arquitetura.md) (componentes, stack, fluxos, decisões)
+
 Planejamento: [`planejamento_sentinela.md`](planejamento_sentinela.md) · Testes: [`planejamento_testes.md`](planejamento_testes.md) · Diário técnico: [`docs/diario_tecnico.md`](docs/diario_tecnico.md)
 
 ## Estrutura
