@@ -133,3 +133,23 @@ Formato de cada entrada: **o que foi feito**, **decisões e por quê**, **proble
 ### Próximos passos
 - [ ] No Mint: baixar a ISO de avaliação, preencher `VM_*` e rodar `python -m provision.vm tudo`.
 - [ ] Testar RDP do celular em `192.168.50.10`.
+
+---
+
+## 2026-11-09 — Fases 3 e 4: banco de dados
+
+### O que foi feito
+- `sql/setup_banco.sh`: versão automática do `mysql_secure_installation` (remove anônimos, root remoto e o banco `test`), aplica o `schema.sql`, cria/sincroniza o usuário `sentinela` e confere que tudo é InnoDB.
+- Etapa `instalar.sh banco`, que ainda confirma o login do usuário de serviço com as credenciais do `.env`.
+- O schema (Fase 4) já existia desde o CI; agora tem guia em `docs/fase3_banco.md`.
+- Job 1 ganhou testes que rodam o `setup_banco.sh` de verdade contra o MySQL do CI.
+
+### Decisões e por quê
+- **Só DML para o usuário `sentinela`** (`SELECT/INSERT/UPDATE/DELETE`): portal e agente não precisam criar nem apagar tabela. O teste prova que `DROP TABLE` é negado.
+- **Root do MySQL pelo socket:** no Mint, o `root` do MySQL autentica pelo usuário do sistema; não há senha de root para guardar nem vazar.
+- **Senha pela entrada padrão do `mysql`**, nunca como argumento (`ps` mostraria). Escape de `\` e `'` testado com uma senha que tem os dois.
+- **Recusa de config perigosa:** `MYSQL_USER=root`, senha curta ou a senha de exemplo do `.env.example`.
+- **Variáveis para o CI** (`HOSTS_SENTINELA`, `MANTER_ROOT_REMOTO`): no container do CI as conexões chegam do IP da bridge do Docker, não de `localhost`. No host os padrões seguros valem.
+
+### Próximos passos
+- [ ] No Mint: `sudo ./instalar.sh banco`, depois `sudo ./instalar.sh portal`.

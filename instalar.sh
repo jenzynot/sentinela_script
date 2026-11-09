@@ -3,6 +3,7 @@
 #
 # Uso (do repositório, depois do setup_host.sh e com o .env preenchido):
 #     sudo ./instalar.sh rede        # Fase 1:   br0 + hostapd + dnsmasq + firewall/NAT
+#     sudo ./instalar.sh banco       # Fases 3-4: MySQL protegido + schema + usuário dedicado
 #     sudo ./instalar.sh portal      # Fase 1.5: portal cativo + ressync (precisa do banco)
 #     sudo ./instalar.sh verificar   # mostra o estado de tudo
 #
@@ -99,6 +100,15 @@ Pronto quando (Fase 1): o celular conecta no SSID e pega IP.
 EOF
 }
 
+# --- Fases 3 e 4: banco ------------------------------------------------------
+
+etapa_banco() {
+    info "Fases 3 e 4 — MySQL protegido, schema e usuário dedicado"
+    bash "$PREFIXO/sql/setup_banco.sh" "$ENV_FILE"
+    banco_acessivel || erro "o usuário de serviço não conseguiu logar no MySQL com o .env"
+    ok "usuário '$USUARIO_SVC' do sistema acessa o banco com as credenciais do .env"
+}
+
 # --- Fase 1.5: portal cativo -------------------------------------------------
 
 banco_acessivel() {   # o usuário de serviço consegue logar no MySQL com o .env?
@@ -149,6 +159,7 @@ etapa_verificar() {
 ETAPA="${1:-}"
 case "$ETAPA" in
     rede)      preparar_base; etapa_rede ;;
+    banco)     preparar_base; etapa_banco ;;
     portal)    preparar_base; etapa_portal ;;
     verificar) etapa_verificar ;;
     *)

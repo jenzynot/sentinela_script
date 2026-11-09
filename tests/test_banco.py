@@ -1,10 +1,12 @@
 """Job 1 — Banco de dados: schema + queries (planejamento_testes.md §2)."""
+import os
+import subprocess
 from datetime import datetime
 
 import mysql.connector
 import pytest
 
-from conftest import NOME_BANCO, TABELAS, aplicar_schema, inserir_dispositivo
+from conftest import NOME_BANCO, RAIZ, TABELAS, _admin, aplicar_schema, inserir_dispositivo
 
 pytestmark = pytest.mark.banco
 
@@ -122,3 +124,71 @@ def test_ciclo_completo_e_joins_do_relatorio(banco):
         JOIN TB_VARREDURAS v   ON v.id_varredura   = a.id_varredura
     """)
     assert cur.fetchall() == [("dispositivo_nao_autorizado", "alto", "intruso", id_varr)]
+
+
+# --- Fase 3: sql/setup_banco.sh ---------------------------------------------
+
+ER_TABLEACCESS_DENIED = 1142
+USUARIO_SETUP = "sentinela_setup"
+SENHA_SETUP = "senha-do-setup-com-'aspas'-e-\barra"
+
+
+def rodar_setup(env_file):
+    a = _admin()
+    return subprocess.run(
+        ["bash", str(RAIZ / "sql" / "setup_banco.sh"), str(env_file)],
+        capture_output=True, text=True,
+        env={**os.environ, "MYSQL_HOST": a["host"], "MYSQL_TCP_PORT": str(a["port"]),
+             "MYSQL_ADMIN_USER": a["user"], "MYSQL_PWD": a["password"],
+             "HOSTS_SENTINELA": "%", "MANTER_ROOT_REMOTO": "1"})
+
+
+@pytest.fixture
+def env_setup(tmp_path, banco):
+    arq = tmp_path / "sentinela.env"
+    # a senha tem aspas e barra invertida de propósito: testa o escape do SQL
+    arq.write_text(f"MYSQL_USER={USUARIO_SETUP}\nMYSQL_PASSWORD={SENHA_SETUP}\n"
+                   "MYSQL_DATABASE=vigia_de_rede\n")
+    yield arq
+    banco.cursor().execute(f"DROP USER IF EXISTS '{USUARIO_SETUP}'@'%'")
+
+
+def test_setup_banco_e_idempotente_e_da_so_dml(env_setup):
+    """Dado   um MySQL com o banco já criado
+    Quando  rodo setup_banco.sh duas vezes
+    Então   as duas terminam bem, e o usuário criado consegue ler/gravar no
+            vigia_de_rede mas não consegue apagar tabela nem ler mysql.user"""
+    for _ in range(2):
+        r = rodar_setup(env_setup)
+        assert r.returncode == 0, r.stdout + r.stderr
+
+    a = _admin()
+    cx = mysql.connector.connect(host=a["host"], port=a["port"], user=USUARIO_SETUP,
+                                 password=SENHA_SETUP, database=NOME_BANCO, autocommit=True)
+    cur = cx.cursor()
+    cur.execute("INSERT INTO TB_DISPOSITIVOS (endereco_mac) VALUES ('02:00:00:00:00:77')")
+    cur.execute("SELECT COUNT(*) FROM TB_DISPOSITIVOS")
+    assert cur.fetchone()[0] == 1
+
+    with pytest.raises(mysql.connector.ProgrammingError) as erro:
+        cur.execute("DROP TABLE TB_ALERTAS")
+    assert erro.value.errno == ER_TABLEACCESS_DENIED
+    with pytest.raises(mysql.connector.ProgrammingError):
+        cur.execute("SELECT * FROM mysql.user")
+    cx.close()
+
+
+@pytest.mark.parametrize("conteudo, trecho", [
+    ("MYSQL_USER=root\nMYSQL_PASSWORD=uma-senha-bem-longa\n", "root"),
+    ("MYSQL_USER=sentinela\nMYSQL_PASSWORD=curta\n", "12 caracteres"),
+    ("MYSQL_USER=sentinela\nMYSQL_PASSWORD=troque-esta-senha\n", "troque"),
+    ("MYSQL_USER=a';DROP\nMYSQL_PASSWORD=uma-senha-bem-longa\n", "inválido"),
+])
+def test_setup_banco_recusa_config_perigosa(tmp_path, banco, conteudo, trecho):
+    arq = tmp_path / "sentinela.env"
+    arq.write_text(conteudo)
+
+    r = rodar_setup(arq)
+
+    assert r.returncode != 0
+    assert trecho in r.stderr
