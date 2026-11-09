@@ -30,8 +30,10 @@ if [[ "$CONFIRMADO" != "--sim" ]]; then
 fi
 
 echo "Backup de segurança do estado atual:"
-BACKUP_DIR="$BACKUP_DIR" "$DIR/backup.sh"
+BACKUP_DIR="$BACKUP_DIR" bash "$DIR/backup.sh"
 
-gunzip < "$ARQUIVO" | mysql --user="${MYSQL_ADMIN_USER:-root}"
+CONEXAO=(--user="${MYSQL_ADMIN_USER:-root}")
+[[ -n "${MYSQL_HOST:-}" ]] && CONEXAO+=(--host="$MYSQL_HOST" --port="${MYSQL_TCP_PORT:-3306}")
+gunzip < "$ARQUIVO" | mysql "${CONEXAO[@]}"
 echo "$(date '+%F %T') restore concluído a partir de: $ARQUIVO"
 echo "Lembrete: o firewall espelha o banco — rode 'sudo systemctl restart sentinela-ressync'."

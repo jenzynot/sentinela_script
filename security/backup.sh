@@ -23,7 +23,11 @@ mkdir -p "$BACKUP_DIR"
 
 # --single-transaction: dump consistente sem travar o InnoDB (o agente segue gravando)
 # --databases: o arquivo recria o banco sozinho no restore
-mysqldump --user="${MYSQL_ADMIN_USER:-root}" --single-transaction --no-tablespaces \
+# (o mysqldump ignora MYSQL_HOST no ambiente: host/porta vão explícitos quando definidos)
+CONEXAO=(--user="${MYSQL_ADMIN_USER:-root}")
+[[ -n "${MYSQL_HOST:-}" ]] && CONEXAO+=(--host="$MYSQL_HOST" --port="${MYSQL_TCP_PORT:-3306}")
+
+mysqldump "${CONEXAO[@]}" --single-transaction --no-tablespaces \
     --routines --triggers --databases vigia_de_rede | gzip > "$ARQUIVO.tmp"
 gzip -t "$ARQUIVO.tmp"          # arquivo corrompido não substitui nada
 mv "$ARQUIVO.tmp" "$ARQUIVO"

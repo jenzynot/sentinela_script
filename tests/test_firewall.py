@@ -2,6 +2,8 @@
 
 Roda no runner com `sudo nft`, exatamente como o portal roda no host.
 """
+import re
+
 import pytest
 
 import firewall_ctl
@@ -50,7 +52,8 @@ def test_vpn_alcanca_a_rede_da_casa_e_nat_so_para_o_segmento(ruleset):
     post = nft("list", "chain", "inet", "portal", "postrouting").stdout
 
     assert 'iifname "wg0" oifname "br0" accept' in forward
-    assert 'iifname "br0" oifname != { "br0", "wg0" } masquerade' in post
+    # o nft pode listar os elementos do conjunto em qualquer ordem
+    assert re.search(r'iifname "br0" oifname != \{ ("br0", "wg0"|"wg0", "br0") \} masquerade', post)
 
 
 def test_liberar_coloca_mac_no_conjunto(ruleset):

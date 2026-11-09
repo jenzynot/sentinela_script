@@ -56,6 +56,8 @@ preparar_base() {
         --exclude __pycache__ --exclude .pytest_cache --exclude .github \
         "$REPO_DIR/" "$PREFIXO/"
     chown -R root:root "$PREFIXO"
+    # scripts executáveis mesmo se o modo se perdeu no caminho (edição pelo Windows, zip...)
+    find "$PREFIXO" -name '*.sh' -exec chmod 755 {} +
     [[ -x $PREFIXO/.venv/bin/python ]] || python3 -m venv "$PREFIXO/.venv"
     "$PREFIXO/.venv/bin/pip" install -q --upgrade pip
     "$PREFIXO/.venv/bin/pip" install -q -r "$PREFIXO/requirements.txt"
