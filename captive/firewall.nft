@@ -1,0 +1,33 @@
+#!/usr/sbin/nft -f
+# captive/firewall.nft — roda uma vez, no boot (antes do ressync.py).
+#
+# Idempotente: as duas primeiras linhas garantem que a tabela exista e em
+# seguida a apagam, tudo na mesma transação. Recarregar o arquivo nunca
+# duplica regras. O conjunto 'autorizados' renasce vazio; quem o repovoa é o
+# ressync.py, a partir do banco (banco = verdade, conjunto = espelho).
+table inet portal
+delete table inet portal
+
+table inet portal {
+    set autorizados {
+        type ether_addr          # a whitelist viva
+    }
+
+    chain forward {
+        type filter hook forward priority filter; policy drop;
+        ct state established,related accept
+        ether saddr @autorizados accept
+        # quem não está no conjunto cai aqui (policy drop)
+    }
+
+    chain prerouting {
+        type nat hook prerouting priority dstnat; policy accept;
+        # HTTP de quem NÃO está autorizado vai pro portal Flask (porta 8080 no host)
+        iifname "br0" ether saddr != @autorizados tcp dport 80 redirect to :8080
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        oifname != "br0" masquerade
+    }
+}

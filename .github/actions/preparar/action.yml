@@ -1,0 +1,47 @@
+name: Preparar ambiente do Sentinela
+description: Python + .venv + pacotes de sistema + usuário 'sentinela' no MySQL do job
+
+inputs:
+  pacotes:
+    description: 'Pacotes apt extras, ex. "nftables" ou "nmap arp-scan"'
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"   # mesma versão do Linux Mint 22
+        cache: pip
+        cache-dependency-path: requirements*.txt
+
+    - name: Pacotes de sistema
+      shell: bash
+      run: |
+        pacotes="${{ inputs.pacotes }}"
+        command -v mysql >/dev/null || pacotes="$pacotes mysql-client"
+        if [ -n "${pacotes// /}" ]; then
+          sudo apt-get update -q
+          sudo apt-get install -y -q $pacotes
+        fi
+
+    - name: Criar .venv e instalar dependências
+      shell: bash
+      run: |
+        python -m venv .venv
+        .venv/bin/pip install -q --upgrade pip
+        .venv/bin/pip install -q -r requirements-dev.txt
+
+    - name: Esperar o MySQL e criar o usuário 'sentinela'
+      shell: bash
+      run: |
+        export MYSQL_PWD="$MYSQL_ADMIN_PASSWORD"
+        for i in $(seq 1 30); do
+          mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_ADMIN_USER" -e "SELECT 1" >/dev/null 2>&1 && break
+          echo "aguardando MySQL ($i)..."; sleep 2
+        done
+        mysql -h "$MYSQL_HOST" -P "$MYSQL_PORT" -u "$MYSQL_ADMIN_USER" <<SQL
+        CREATE USER IF NOT EXISTS '$MYSQL_USER'@'%' IDENTIFIED BY '$MYSQL_PASSWORD';
+        GRANT SELECT, INSERT, UPDATE, DELETE ON $MYSQL_DATABASE.* TO '$MYSQL_USER'@'%';
+        SQL

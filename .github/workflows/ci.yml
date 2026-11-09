@@ -1,0 +1,82 @@
+# CI do Sentinela — especificação em planejamento_testes.md
+#
+# Tudo que vem DEPOIS de "o cliente já está na br0" é testado aqui, num Linux
+# real. Wi-Fi, celular, VM Windows e RDP ficam no roteiro manual do Mint.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  MYSQL_HOST: 127.0.0.1
+  MYSQL_PORT: "3306"
+  MYSQL_ADMIN_USER: root
+  MYSQL_ADMIN_PASSWORD: root
+  MYSQL_USER: sentinela          # o código nunca usa root
+  MYSQL_PASSWORD: sentinela-ci
+  MYSQL_DATABASE: vigia_de_rede
+  PORTAL_SENHA: senha-ci
+
+jobs:
+  banco:
+    name: "Job 1 · Banco (schema + queries)"
+    runs-on: ubuntu-latest
+    services:
+      mysql: &mysql
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports: ["3306:3306"]
+        # -h 127.0.0.1 força TCP: só fica saudável depois da inicialização real
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+      - run: .venv/bin/python -m pytest -v -m banco
+
+  firewall:
+    name: "Job 2 · Firewall / whitelist (nftables)"
+    runs-on: ubuntu-latest
+    services:
+      mysql: *mysql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+        with:
+          pacotes: nftables
+      - run: .venv/bin/python -m pytest -v -m firewall
+
+  rede:
+    name: "Job 3 · Rede simulada + Sentinela"
+    runs-on: ubuntu-latest
+    services:
+      mysql: *mysql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+        with:
+          pacotes: nmap arp-scan
+      # namespaces, bridge e arp-scan precisam de root; -E mantém as MYSQL_*
+      - run: sudo -E .venv/bin/python -m pytest -v -m rede -p no:cacheprovider
+
+  portal:
+    name: "Job 4 · Portal cativo (Flask)"
+    runs-on: ubuntu-latest
+    services:
+      mysql: *mysql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+      - run: .venv/bin/python -m pytest -v -m portal

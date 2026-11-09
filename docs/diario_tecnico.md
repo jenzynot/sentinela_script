@@ -32,3 +32,31 @@ Formato de cada entrada: **o que foi feito**, **decisões e por quê**, **proble
 - [ ] Rodar `sudo ./setup_host.sh` no host Mint e registrar a saída aqui (principalmente o teste de modo AP).
 - [ ] Criar o repositório remoto no GitHub e dar o primeiro push.
 - [ ] Iniciar a Fase 1: `hostapd` + `br0` + `dnsmasq` + NAT com `nftables`.
+
+---
+
+## 2026-11-09 — CI de testes no GitHub Actions
+
+### O que foi feito
+- `python3-venv` instalado no WSL e `.venv` criado (pendência da Fase 0 resolvida).
+- Montado o CI descrito em `planejamento_testes.md`: `.github/workflows/ci.yml` com 4 jobs (banco, firewall, rede simulada, portal) e a action local `.github/actions/preparar` (Python 3.12, `.venv`, pacotes apt, usuário `sentinela` no MySQL).
+- Para os testes terem o que testar, o código que o planejamento já trazia pronto virou arquivo: `sql/schema.sql`, `captive/firewall.nft`, `captive/firewall_ctl.py`, `captive/portal.py`, `captive/ressync.py` e `captive/dados.py` (acesso ao banco).
+- Suíte pytest em `tests/`, um marker por job, casos no formato dado → quando → então.
+
+### Decisões e por quê
+- **Pulado localmente, falha no CI:** sem MySQL, `nft` ou root o teste é pulado (WSL), mas com `CI=true` ele falha. Um pipeline verde precisa significar "testado", não "não rodou".
+- **MySQL 8.0 como service container**, com healthcheck via TCP (`-h 127.0.0.1`): o ping pelo socket responde ainda durante a inicialização temporária do container.
+- **Schema aplicado pelo cliente `mysql`**, igual se faz no host, e não pelo conector Python.
+- **Código usa o usuário `sentinela`** (só SELECT/INSERT/UPDATE/DELETE); o root só é usado pelos testes para recriar o banco.
+- **`firewall.nft` idempotente** (`table` + `delete table` antes da definição): recarregar não duplica regras. O conjunto renasce vazio e o `ressync` o repovoa.
+- **`firewall_ctl` endurecido:** valida o formato do MAC (impede injetar sintaxe nft, ex. `"aa:..., bb:..."` liberaria dois de uma vez), revogar MAC ausente não é erro, e `sincronizar()` faz `flush` + `add` numa única transação nft (ressync deixa o conjunto *exatamente* igual ao banco).
+- **Portal:** senha vem de `PORTAL_SENHA`; sem ela configurada ninguém se registra (falha fechada); comparação com `hmac.compare_digest` (tempo constante).
+- **Credenciais pelo ambiente** (`MYSQL_*`), não no código.
+- **Agente (Fase 5) como contrato:** os testes do Scanner e dos alertas já existem e ficam pulados até `sentinela/` ser criado. A interface esperada está no topo de `tests/test_rede.py`.
+
+### Problemas encontrados
+- O WSL não tem MySQL, `nft`, `nmap` nem `arp-scan`: localmente só deu para validar coleta, sintaxe e a lógica de pular/falhar (36 testes pulados). A execução real acontece no primeiro push.
+
+### Próximos passos
+- [ ] Criar o repositório no GitHub, dar push e acompanhar a primeira execução do CI.
+- [ ] Fase 1: `hostapd` + `br0` + `dnsmasq` no Mint.
